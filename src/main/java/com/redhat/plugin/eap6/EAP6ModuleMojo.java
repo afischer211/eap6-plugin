@@ -85,7 +85,7 @@ import org.w3c.dom.NodeList;
  *           &lt;execution>
  *        &lt;executions>
  *        &lt;configuration>
- *           <dictionaryFiles><dictionaryFile>../../services.dict</dictionaryFile></dictionaryFiles>
+ *           &lt;dictionaryFiles>&lt;dictionaryFile>../../services.dict&lt;/dictionaryFile>&lt;/dictionaryFiles>
  *        &lt;configuration>
  *     &lt;plugin>
  * </pre>
