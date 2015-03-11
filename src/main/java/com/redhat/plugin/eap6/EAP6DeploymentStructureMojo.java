@@ -75,6 +75,18 @@ import org.w3c.dom.NodeList;
  * EAP6 provided modules. These dictionaries declared with this configuration statement are in addition to what is already declared. Multiple dictionary files
  * can be defined. Later declared dictionary files override identical definions in earlier files.</li>
  *
+ * <li>encoding: Charset-encoding for read and write of files. By default,
+ *
+ * <pre>
+ * ${project.build.sourceEncoding}
+ * </pre></li>
+ *
+ * <li>verbose: Extended debug-messages. By default,
+ *
+ * <pre>
+ * false
+ * </pre></li>
+
  * </ul>
  *
  * Usage:

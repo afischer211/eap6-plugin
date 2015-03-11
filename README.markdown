@@ -23,7 +23,11 @@ Configuration items:
    addition to what is already declared. Multiple dictionary files can
    be defined. Later declared dictionary files override identical
    definions in earlier files.
-   
+
+ - `encoding`: Charset-encoding for read and write of files.
+
+ - `verbose`: Extended debug-messages.
+
  - `isSubdeployment`: If true, this project is a sub-deployment of an
    EAR file. A `jboss-subdeployment.xml` will be generated instead of
    `jboss-deployment-structure.xml`. This project should be listed as a
@@ -32,10 +36,10 @@ Configuration items:
    `jboss-deployment-structure.xml`.
 
  - `subDeployments`: A list of `subDeployment` elements, each containing a
-   `groupId` and `artifactId`. The sub-deployments of an EAR file. 
+   `groupId` and `artifactId`. The sub-deployments of an EAR file.
 
 
-Usage 
+Usage
 
 `jboss-deployment-structure` for an EAR file with an ejb-jar:
 
@@ -130,7 +134,7 @@ provided, then a module dependency will be added to
 
     javax.faces:jsf-impl:1.0=com.sun.jsf-impl
     javax.faces:jsf-impl:2.0=com.sun.jsf-impl.2
- 
+
 With this decleration, different versions of the same maven
 artifact is mapped to different modules. The plugin searches for
 the most specific match, that is, if there is a match with a
