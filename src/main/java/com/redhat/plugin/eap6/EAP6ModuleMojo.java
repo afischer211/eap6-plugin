@@ -71,23 +71,23 @@ import org.w3c.dom.NodeList;
  *
  * Usage:
  * <pre>
- * <build>
- *   <plugins>
- *      <plugin>
- *        <groupId>org.apache.maven.plugins</groupId>
- *        <artifactId>eap6-maven-plugin</artifactId>
- *        <version>1.0.0</version>
- *        <executions>
- *           <execution>
- *              <goals>
- *                 <goal>build-module</goal>
- *              </goals>
- *           </execution>
- *        </executions>
- *        <configuration>
+ * &lt;build>
+ *   &lt;plugins>
+ *      &lt;plugin>
+ *        &lt;groupId>org.apache.maven.plugins&lt;groupId>
+ *        &lt;artifactId>eap6-maven-plugin&lt;artifactId>
+ *        &lt;version>1.0.0&lt;version>
+ *        &lt;executions>
+ *           &lt;execution>
+ *              &lt;goals>
+ *                 &lt;goal>build-module&lt;goal>
+ *              &lt;/goals>
+ *           &lt;execution>
+ *        &lt;executions>
+ *        &lt;configuration>
  *           <dictionaryFiles><dictionaryFile>../../services.dict</dictionaryFile></dictionaryFiles>
- *        </configuration>
- *     </plugin>
+ *        &lt;configuration>
+ *     &lt;plugin>
  * </pre>
  *
  * Dictionary file format:
@@ -188,15 +188,15 @@ public class EAP6ModuleMojo extends AbstractEAP6Mojo {
     protected void buildModule(Document doc, Map<Artifact, String> moduleMap) throws MojoFailureException, XPathExpressionException {
 
         // check if there is a mapping in the dictionary for the project artifact
-        DictItem mapping = dictionary.find(project.getGroupId(), project.getArtifactId(), project.getVersion());
-        if (mapping == null || mapping.moduleName == null) {
+        DictItem mapping = dictionaries.find(getLog(),project.getGroupId(), project.getArtifactId(), project.getVersion());
+        if (mapping == null || mapping.getModuleName() == null) {
             throw new MojoFailureException("No mapping found for the project artifact: " + project.getArtifact());
         }
 
         Element root = doc.getDocumentElement();
         if (!root.getTagName().equals("module"))
             throw new MojoFailureException("Root element is not module");
-        root.setAttribute("name", mapping.moduleName);
+        root.setAttribute("name", mapping.getModuleName());
 
         Element dependencies = (Element) xp_dependencies.evaluate(doc, XPathConstants.NODE);
         if (dependencies == null) {

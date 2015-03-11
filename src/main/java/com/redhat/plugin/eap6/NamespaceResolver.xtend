@@ -16,12 +16,11 @@
    limitations under the License.
 */
 
-package com.redhat.plugin.eap6;
+package com.redhat.plugin.eap6
 
-import java.util.Iterator;
-
-import javax.xml.XMLConstants;
-import javax.xml.namespace.NamespaceContext;
+import javax.xml.namespace.NamespaceContext
+import javax.xml.XMLConstants
+import java.util.Iterator
 
 /**
  * Namespace resolver for XML documents
@@ -29,12 +28,11 @@ import javax.xml.namespace.NamespaceContext;
  * @author ykoer
  *
  */
-public class NamespaceResolver implements NamespaceContext {
-
-    public static final String NS_JBOSS_MODULE = "urn:jboss:module:1.0";
+class NamespaceResolver implements NamespaceContext {
+	public static final String NS_JBOSS_MODULE = "urn:jboss:module:1.0";
     public static final String NS_JBOSS_MODULE_PREFIX = "ns1";
 
-    public String getNamespaceURI(String prefix) {
+    override public String getNamespaceURI(String prefix) {
         if (prefix == null) {
             throw new IllegalArgumentException("No prefix provided!");
         } else if (prefix.equals(XMLConstants.DEFAULT_NS_PREFIX)) {
@@ -46,12 +44,12 @@ public class NamespaceResolver implements NamespaceContext {
         }
     }
 
-    public String getPrefix(String namespaceURI) {
+    override public String getPrefix(String namespaceURI) {
         // Not needed in this context.
         return null;
     }
 
-    public Iterator getPrefixes(String namespaceURI) {
+    override public Iterator getPrefixes(String namespaceURI) {
         // Not needed in this context.
         return null;
     }
