@@ -36,12 +36,15 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
+import org.apache.maven.artifact.resolver.filter.ExcludesArtifactFilter;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.sonatype.aether.RepositorySystemSession;
 import org.w3c.dom.Document;
+import org.apache.maven.shared.artifact.filter.StrictPatternExcludesArtifactFilter;
 
 /**
  * This abstract EAP6 Mojo initializes the module dictionaries and the skeleton file
@@ -78,11 +81,33 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.build.finalName}", required = true)
     protected String buildFinalName;
 
+    /**
+     * Gives the list of allowed dependency-scopes, default is &lt;provided&gt;
+     * @since 1.0.1
+     */
+    @Parameter(property = "allowedDepScopes", required = true, defaultValue = Artifact.SCOPE_PROVIDED)
+    protected List<String> allowedDepScopes;
+
+    /**
+     * Gives the list of allowed artifact-types
+     * @since 1.0.1
+     */
+    @Parameter(property = "allowedDepTypes", required = false)
+    protected List<String> allowedDepTypes;
+
+    /**
+     * Gives the list of excluded artifacts
+     * @since 1.0.1
+     */
+    @Parameter(property = "excludedArtifacts", required = false)
+    protected List<String> excludedArtifacts;
+
     protected Dictionaries dictionaries = new Dictionaries();
     protected Map<Artifact, String> artifactsAsModules;
     protected Map<String, Artifact> reverseMap = new HashMap<String, Artifact>();
 
     /**
+     * Initialize mapping dictionaries
      *
      * @throws MojoFailureException
      */
@@ -103,27 +128,44 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
         // Get the artifacts
         @SuppressWarnings("unchecked")
         Set<Artifact> dependencies = project.getArtifacts();
+
         if (verbose) {
             for (Artifact x : dependencies)
-                getLog().debug("Project-Dependency Artifact: <" + x + ">");
+                getLog().debug("Project-Dependency Artifact: <" + x + "> type: <" + x.getType() + "> scope: <" + x.getScope() + ">");
         }
         // Find artifacts that are not provided, but in the dictionary,
         // and warn
-        Set<Artifact> artifactsNotProvided = new TreeSet<Artifact>();
+        Set<Artifact> artifactsNotMatchingScope = new TreeSet<Artifact>();
+        Set<Artifact> artifactsNotMatchingType = new TreeSet<Artifact>();
+        Set<Artifact> artifactsMatchingExPatterns = new TreeSet<Artifact>();
+
         // Find artifacts that should be in deployment structure, that is,
         // all artifacts that have a non-null mapping, and provided
         artifactsAsModules = new HashMap<Artifact, String>();
 
         reverseMap = new HashMap<String, Artifact>();
+
+        getLog().info("Excluded artifacts: "+listToString(excludedArtifacts));
+
+        ArtifactFilter artifactFilter = excludedArtifacts!=null?new StrictPatternExcludesArtifactFilter(excludedArtifacts):null;
+
         for (Artifact a : dependencies) {
             DictItem item = dictionaries.find(getLog(), a.getGroupId(), a.getArtifactId(), a.getVersion());
             if (item != null && item.getModuleName() != null) {
                 reverseMap.put(item.getModuleName(), a);
 
-                if (!a.getScope().equals(Artifact.SCOPE_PROVIDED)) {
-                    artifactsNotProvided.add(a);
+                if (!isMatchingScope(a)) {
+                    artifactsNotMatchingScope.add(a);
                 } else {
-                    artifactsAsModules.put(a, item.getModuleName());
+                    if (!isMatchingType(a)) {
+                        artifactsNotMatchingType.add(a);
+                    } else {
+                        if (artifactFilter!=null && !artifactFilter.include(a)) {
+                            artifactsMatchingExPatterns.add(a);
+                        } else {
+                            artifactsAsModules.put(a, item.getModuleName());
+                        }
+                    }
                 }
             } else {
                 if (verbose) {
@@ -132,11 +174,34 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
             }
         }
 
-        for (Artifact a : artifactsNotProvided) {
+        for (Artifact a : artifactsNotMatchingScope) {
             getLog().warn(
-                    "EAP6: Artifact <" + a + "> is not provided, but can be included as an EAP6 module "
+                    "EAP6: Artifact <" + a + "> is not of required scope \"" + listToString(allowedDepScopes) + "\", but can be included as an EAP6 module "
                             + dictionaries.find(getLog(), a.getGroupId(), a.getArtifactId(), a.getVersion()));
         }
+        for (Artifact a : artifactsNotMatchingType) {
+            getLog().warn("EAP6: Artifact <" + a + "> is not of required type \"" + listToString(allowedDepTypes) + "\"");
+        }
+        for (Artifact a : artifactsMatchingExPatterns) {
+            getLog().warn("EAP6: Artifact <" + a + "> matches excluded artifact-patterns");
+        }
+    }
+
+    protected String listToString(List<String> list) {
+        StringBuilder sb = new StringBuilder();
+        for (String scope : list) {
+            sb.append(scope + ",");
+        }
+        sb.deleteCharAt(sb.length() - 1);
+        return sb.toString();
+    }
+
+    protected boolean isMatchingScope(Artifact a) {
+        return allowedDepScopes.contains(a.getScope());
+    }
+
+    protected boolean isMatchingType(Artifact a) {
+        return (allowedDepTypes.isEmpty() ? true : allowedDepTypes.contains(a.getType()));
     }
 
     protected Artifact findArtifact(String groupId, String artifactId) {
