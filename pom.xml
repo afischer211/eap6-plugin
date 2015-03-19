@@ -93,6 +93,11 @@
             <version>${maven.api.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.maven.shared</groupId>
+            <artifactId>maven-common-artifact-filters</artifactId>
+            <version>1.4</version>
+        </dependency>
+        <dependency>
             <groupId>org.eclipse.xtend</groupId>
             <artifactId>org.eclipse.xtend.lib</artifactId>
             <version>${xtend.version}</version>
@@ -203,7 +208,7 @@
     </build>
     <properties>
         <maven.api.version>3.0.5</maven.api.version>
-        <xtend.version>2.7.3</xtend.version>
+        <xtend.version>2.8.0</xtend.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 </project>
