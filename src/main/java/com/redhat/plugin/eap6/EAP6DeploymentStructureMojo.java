@@ -79,14 +79,18 @@ import org.w3c.dom.NodeList;
  *
  * <pre>
  * ${project.build.sourceEncoding}
- * </pre></li>
+ * </pre>
+ *
+ * </li>
  *
  * <li>verbose: Extended debug-messages. By default,
  *
  * <pre>
  * false
- * </pre></li>
-
+ * </pre>
+ *
+ * </li>
+ *
  * </ul>
  *
  * Usage:
@@ -150,6 +154,12 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
 
     @Parameter(defaultValue = "false", required = true)
     private boolean isSubDeployment;
+
+    @Parameter(defaultValue = "main", required = true)
+    private String defaultSlot;
+
+    @Parameter(defaultValue = "true", required = true)
+    private boolean exportModules;
 
     private static XPathFactory xpf;
     private static XPathExpression xp_module;
@@ -246,7 +256,7 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
                 destinationDir = new File(project.getBuild().getOutputDirectory(), "META-INF");
             if (!destinationDir.exists())
                 destinationDir.mkdir();
-            //String xml = getStringFromDocument(doc);
+            // String xml = getStringFromDocument(doc);
 
             writeXmlFile(doc, destinationDir, isSubDeployment ? JBOSS_SUBDEPLOYMENT : JBOSS_DEPLOYMENT_STRUCTURE);
         }
@@ -332,6 +342,12 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
                 getLog().debug("insert module-dependency for " + module);
                 Element moduleEl = doc.createElement("module");
                 moduleEl.setAttribute("name", module);
+                if (defaultSlot != null && !defaultSlot.isEmpty()) {
+                    moduleEl.setAttribute("slot", defaultSlot);
+                }
+                if (exportModules) {
+                    moduleEl.setAttribute("export", "true");
+                }
                 dependencies.appendChild(moduleEl);
                 // if (verbose) {
                 // getLog().debug("Module <" + moduleEl.getAttribute("name") + ">:" + moduleEl);
