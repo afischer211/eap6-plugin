@@ -20,7 +20,7 @@ package com.redhat.plugin.eap6;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.StringWriter;
+import java.io.InputStream;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -30,11 +30,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
@@ -48,6 +43,7 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.codehaus.plexus.util.DirectoryScanner;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -197,13 +193,22 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
                     if (artifact == null)
                         throw new MojoExecutionException("Cannot find file for artifact " + sd);
                     getLog().debug("Sub deployment artifact:" + artifact + " file:" + artifact.getFile());
-                    sd.setName(artifact.getFile().getName());
                     try {
-                        Document doc = getDeploymentStructure(artifact.getFile());
-                        if (doc == null)
-                            throw new MojoExecutionException("No deployment structure in " + artifact
-                                    + ", add eap6 plugin to that project to generate deployment structure");
-                        sd.setDocument(doc);
+                        final File artifactFile = artifact.getFile();
+                        if (artifactFile != null) {
+                            sd.setName(artifactFile.getName());
+                            if (artifactFile.canRead()) {
+                                Document doc = getDeploymentStructure(artifactFile);
+                                if (doc == null)
+                                    throw new MojoExecutionException("No deployment structure in " + artifact
+                                            + ", add eap6 plugin to that project to generate deployment structure");
+                                sd.setDocument(doc);
+                            } else {
+                                getLog().warn("Can not read artifact-file <" + artifactFile.getAbsolutePath() + ">");
+                            }
+                        } else {
+                            getLog().warn("Can not resolve artifact-file for artifact <" + artifact.toString() + ">");
+                        }
                     } catch (Exception e) {
                         throw new MojoExecutionException(e.toString());
                     }
@@ -245,20 +250,21 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
                 throw new MojoFailureException("Cannot process XML", e);
             }
 
-            File destinationDir;
-            if (project.getPackaging().equalsIgnoreCase("war")) {
-                File f = new File(project.getBuild().getDirectory(), project.getBuild().getFinalName());
-                f.mkdir();
-                destinationDir = new File(f, "WEB-INF");
-            } else if (project.getPackaging().equalsIgnoreCase("ear"))
-                destinationDir = new File(new File(project.getBuild().getDirectory(), project.getBuild().getFinalName()), "META-INF");
-            else
-                destinationDir = new File(project.getBuild().getOutputDirectory(), "META-INF");
+            if (destinationDir == null) {
+                if (project.getPackaging().equalsIgnoreCase("war")) {
+                    File f = new File(project.getBuild().getDirectory(), project.getBuild().getFinalName());
+                    f.mkdir();
+                    destinationDir = new File(f, "WEB-INF");
+                } else if (project.getPackaging().equalsIgnoreCase("ear"))
+                    destinationDir = new File(new File(project.getBuild().getDirectory(), project.getBuild().getFinalName()), "META-INF");
+                else
+                    destinationDir = new File(project.getBuild().getOutputDirectory(), "META-INF");
+            }
             if (!destinationDir.exists())
-                destinationDir.mkdir();
+                destinationDir.mkdirs();
             // String xml = getStringFromDocument(doc);
-
             writeXmlFile(doc, destinationDir, isSubDeployment ? JBOSS_SUBDEPLOYMENT : JBOSS_DEPLOYMENT_STRUCTURE);
+            addResourceDir(destinationDir);
         }
     }
 
@@ -372,8 +378,9 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
         }
     }
 
-    protected Document getDeploymentStructure(File file) throws Exception {
-        ZipInputStream zis = new ZipInputStream(new FileInputStream(file));
+    private Document getDeploymentStructureFromArchive(File zipFile) throws Exception {
+        getLog().debug("Read deployment-informations from archive <"+zipFile+">");
+        ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
         ZipEntry entry;
         Document doc = null;
         boolean done = false;
@@ -398,5 +405,38 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
         }
         zis.close();
         return doc;
+    }
+
+    private Document getDeploymentStructureFromDirectory(File directory) throws Exception {
+        getLog().debug("Read deployment-informations from directory <"+directory+">");
+        DirectoryScanner ds = new DirectoryScanner();
+        ds.setBasedir(directory);
+        ds.setIncludes(new String[] {"**/META-INF/" + JBOSS_SUBDEPLOYMENT,"**/meta-inf/" + JBOSS_SUBDEPLOYMENT,"**/WEB-INF/" + JBOSS_SUBDEPLOYMENT,"**/web-inf/" + JBOSS_SUBDEPLOYMENT});
+        ds.scan();
+        String[] fileNames = ds.getIncludedFiles();
+        getLog().debug(""+fileNames.length+" deployment-information files found");
+        Document doc = null;
+        for(String fileName:fileNames) {
+            File f = new File(directory,fileName);
+            InputStream is = new FileInputStream(f);
+            byte[] buf = IOUtils.toByteArray(is);
+            getLog().debug(new String(buf, encoding));
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            // doc=factory.newDocumentBuilder().parse(new ByteArrayInputStream(buf),encoding);
+            doc = factory.newDocumentBuilder().parse(new org.xml.sax.InputSource(new java.io.StringReader(new String(buf, encoding).trim())));
+            is.close();
+            break;
+        }
+
+        return doc;
+    }
+
+    protected Document getDeploymentStructure(File file) throws Exception {
+        if(file.isDirectory()) { // inside Eclipse/m2e??
+            return getDeploymentStructureFromDirectory(file);
+        }else {
+            return getDeploymentStructureFromArchive(file);
+        }
     }
 }
