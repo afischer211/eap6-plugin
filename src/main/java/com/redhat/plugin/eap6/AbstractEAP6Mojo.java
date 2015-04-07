@@ -21,7 +21,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,16 +38,18 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
-import org.apache.maven.artifact.resolver.filter.ExcludesArtifactFilter;
+import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
-import org.sonatype.aether.RepositorySystemSession;
-import org.w3c.dom.Document;
 import org.apache.maven.shared.artifact.filter.StrictPatternExcludesArtifactFilter;
+import org.sonatype.plexus.build.incremental.BuildContext;
+import org.w3c.dom.Document;
 
 /**
  * This abstract EAP6 Mojo initializes the module dictionaries and the skeleton file
@@ -54,11 +59,8 @@ import org.apache.maven.shared.artifact.filter.StrictPatternExcludesArtifactFilt
  */
 public abstract class AbstractEAP6Mojo extends AbstractMojo {
 
-    @Parameter(defaultValue = "${project}", readonly = true)
+    @Parameter(defaultValue = "${project}", readonly = true, required = true)
     protected MavenProject project;
-
-    @Parameter(defaultValue = "${repositorySystemSession}", readonly = true)
-    private RepositorySystemSession session;
 
     @Parameter(defaultValue = "true")
     protected Boolean generate = Boolean.TRUE;
@@ -68,6 +70,14 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
 
     @Parameter(defaultValue = "${basedir}/src/main/etc", required = true)
     protected File skeletonDir;
+
+    /**
+     * Folder for generated artifacts; if null, then it will be calculated based on project packaging-type
+     *
+     * @since 1.0.1
+     */
+    @Parameter
+    protected File destinationDir;
 
     @Parameter(defaultValue = "${project.build.sourceEncoding}")
     protected String encoding;
@@ -83,6 +93,7 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
 
     /**
      * Gives the list of allowed dependency-scopes, default is &lt;provided&gt;
+     *
      * @since 1.0.1
      */
     @Parameter(property = "allowedDepScopes", required = true, defaultValue = Artifact.SCOPE_PROVIDED)
@@ -90,6 +101,7 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
 
     /**
      * Gives the list of allowed artifact-types
+     *
      * @since 1.0.1
      */
     @Parameter(property = "allowedDepTypes", required = false)
@@ -97,10 +109,23 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
 
     /**
      * Gives the list of excluded artifacts
+     *
      * @since 1.0.1
      */
     @Parameter(property = "excludedArtifacts", required = false)
     protected List<String> excludedArtifacts;
+
+    /**
+     * Activates the adding of destinationDir to project resources
+     *
+     * @since 1.0.1
+     */
+    @Parameter(defaultValue = "false")
+    protected Boolean addResourceFolder = Boolean.FALSE;
+
+    // Injection of BuildContext for m2e-compatibility
+    @Component
+    protected BuildContext buildContext;
 
     protected Dictionaries dictionaries = new Dictionaries();
     protected Map<Artifact, String> artifactsAsModules;
@@ -118,16 +143,23 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
             dictionaries.addDictionary(getClass().getResourceAsStream("/eap6.dict"));
             // load configured dictionaries
             for (File f : dictionaryFiles) {
-                getLog().debug("Reading dict-file " + f.getName());
-                dictionaries.addDictionary(f);
+                if (f != null && f.canRead()) {
+                    getLog().debug("Reading dict-file " + f.getName());
+                    dictionaries.addDictionary(f);
+                }
             }
         } catch (Exception e) {
             throw new MojoFailureException("Cannot load dictionaries", e);
         }
 
         // Get the artifacts
-        @SuppressWarnings("unchecked")
-        Set<Artifact> dependencies = project.getArtifacts();
+        Set<Artifact> dependencies;
+        if (project != null) {
+            dependencies = project.getArtifacts();
+        } else {
+            dependencies = new HashSet<Artifact>();
+            getLog().warn("No project available, getting dependencies skipped");
+        }
 
         if (verbose) {
             for (Artifact x : dependencies)
@@ -145,9 +177,9 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
 
         reverseMap = new HashMap<String, Artifact>();
 
-        getLog().info("Excluded artifacts: "+listToString(excludedArtifacts));
+        getLog().info("Excluded artifacts: " + listToString(excludedArtifacts));
 
-        ArtifactFilter artifactFilter = excludedArtifacts!=null?new StrictPatternExcludesArtifactFilter(excludedArtifacts):null;
+        ArtifactFilter artifactFilter = excludedArtifacts != null ? new StrictPatternExcludesArtifactFilter(excludedArtifacts) : null;
 
         for (Artifact a : dependencies) {
             DictItem item = dictionaries.find(getLog(), a.getGroupId(), a.getArtifactId(), a.getVersion());
@@ -160,7 +192,7 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
                     if (!isMatchingType(a)) {
                         artifactsNotMatchingType.add(a);
                     } else {
-                        if (artifactFilter!=null && !artifactFilter.include(a)) {
+                        if (artifactFilter != null && !artifactFilter.include(a)) {
                             artifactsMatchingExPatterns.add(a);
                         } else {
                             artifactsAsModules.put(a, item.getModuleName());
@@ -205,7 +237,6 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
     }
 
     protected Artifact findArtifact(String groupId, String artifactId) {
-        @SuppressWarnings("unchecked")
         Set<Artifact> artifacts = project.getArtifacts();
         if (verbose) {
             getLog().debug("Searching " + groupId + ":" + artifactId + " in " + artifacts);
@@ -252,21 +283,32 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
             transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
             transformer.transform(new DOMSource(doc), new StreamResult(ostream));
             ostream.close();
+            refreshEclipse(destinationFile);
         } catch (Exception e) {
             throw new MojoFailureException("Cannot write output file", e);
         }
     }
 
-    protected void writeXmlFile(String content, File workDirectory, String fileName) throws MojoFailureException {
+    protected void writeXmlFile(final String content, final File workDirectory, final String fileName) throws MojoFailureException {
         File destinationFile = new File(workDirectory, fileName);
 
         try {
             FileOutputStream ostream = new FileOutputStream(destinationFile);
             ostream.write(content.getBytes(Charset.forName(encoding)));
             ostream.close();
+            refreshEclipse(destinationFile);
         } catch (Exception e) {
             throw new MojoFailureException("Cannot write output file", e);
         }
+    }
+
+    private void refreshEclipse(final File file) {
+        if (buildContext != null && file != null && file.exists()) {
+            if (verbose)
+                getLog().debug("refresh for build-context with class <" + buildContext.getClass().getName() + ">");
+            buildContext.refresh(file); // inform Eclipse-Workspace about file-modifications
+        } else
+            getLog().warn("No build-context available!");
     }
 
     /**
@@ -290,4 +332,20 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
         }
     }
 
+    protected void addResourceDir(File resDir) {
+        if (addResourceFolder && resDir != null && resDir.exists()) {
+            Resource res = new Resource();
+            Path pathResourceDir = Paths.get(resDir.toURI());
+            Path pathProject = Paths.get(project.getBasedir().toURI());
+            Path pathRelativeDir = pathProject.relativize(pathResourceDir);
+            String stringRelativeDir = FilenameUtils.separatorsToUnix(pathRelativeDir.toString());
+            res.setDirectory(stringRelativeDir);
+            getLog().info("Adding dir <" + resDir.getPath() + "> as relative path <" + stringRelativeDir + "> to project-resources");
+            if (project != null) {
+                project.addResource(res);
+            } else {
+                getLog().warn("No project available, adding of resource-dir skipped");
+            }
+        }
+    }
 }
