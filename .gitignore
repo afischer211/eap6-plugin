@@ -8,3 +8,5 @@ target/*
 /target/
 /.settings/
 /.*
+/target/*
+${project.build.directory}/*
