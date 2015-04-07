@@ -38,7 +38,7 @@
                     <excludedArtifacts>
                         <param>org.jboss.*:*.api</param>
                     </excludedArtifacts>
-                    <destinationDir>${project.build.directory}/generated-resources/META-INF</destinationDir>
+                    <destinationDir>target/generated-resources/META-INF</destinationDir>
                     <skeletonDir>${basedir}/src/main/etc</skeletonDir>
                 </configuration>
             </plugin>
