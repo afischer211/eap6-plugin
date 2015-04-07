@@ -19,8 +19,9 @@ class Dictionaries {
 	}
 
 	def public void addDictionary(File f) throws IOException, ParseException {
+		if(f==null || !f.exists || !f.canRead) return;
 		val FileReader reader = new FileReader(f);
-		addDictionary(new Dictionary(f.name,DictItemBuilder.parse(reader)));
+		addDictionary(new Dictionary(f.name, DictItemBuilder.parse(reader)));
 	}
 
 	def public void addDictionary(InputStream stream) throws IOException, ParseException {
