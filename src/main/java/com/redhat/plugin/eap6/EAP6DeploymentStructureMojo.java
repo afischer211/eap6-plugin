@@ -379,7 +379,7 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
     }
 
     private Document getDeploymentStructureFromArchive(File zipFile) throws Exception {
-        getLog().debug("Read deployment-informations from archive <"+zipFile+">");
+        getLog().debug("Read deployment-informations from archive <" + zipFile + ">");
         ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
         ZipEntry entry;
         Document doc = null;
@@ -388,7 +388,9 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
             String entryName = entry.getName().toLowerCase();
             if (entryName.endsWith("meta-inf/" + JBOSS_SUBDEPLOYMENT) || entryName.endsWith("web-inf/" + JBOSS_SUBDEPLOYMENT)) {
                 byte[] buf = IOUtils.toByteArray(zis);
-                getLog().debug(new String(buf, encoding));
+                if (verbose) {
+                    getLog().debug(new String(buf, encoding));
+                }
                 DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
                 factory.setNamespaceAware(true);
                 // doc=factory.newDocumentBuilder().parse(new ByteArrayInputStream(buf),encoding);
@@ -408,19 +410,22 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
     }
 
     private Document getDeploymentStructureFromDirectory(File directory) throws Exception {
-        getLog().debug("Read deployment-informations from directory <"+directory+">");
+        getLog().debug("Read deployment-informations from directory <" + directory + ">");
         DirectoryScanner ds = new DirectoryScanner();
         ds.setBasedir(directory);
-        ds.setIncludes(new String[] {"**/META-INF/" + JBOSS_SUBDEPLOYMENT,"**/meta-inf/" + JBOSS_SUBDEPLOYMENT,"**/WEB-INF/" + JBOSS_SUBDEPLOYMENT,"**/web-inf/" + JBOSS_SUBDEPLOYMENT});
+        ds.setIncludes(new String[] { "**/META-INF/" + JBOSS_SUBDEPLOYMENT, "**/meta-inf/" + JBOSS_SUBDEPLOYMENT, "**/WEB-INF/" + JBOSS_SUBDEPLOYMENT,
+                "**/web-inf/" + JBOSS_SUBDEPLOYMENT });
         ds.scan();
         String[] fileNames = ds.getIncludedFiles();
-        getLog().debug(""+fileNames.length+" deployment-information files found");
+        getLog().debug("" + fileNames.length + " deployment-information files found");
         Document doc = null;
-        for(String fileName:fileNames) {
-            File f = new File(directory,fileName);
+        for (String fileName : fileNames) {
+            File f = new File(directory, fileName);
             InputStream is = new FileInputStream(f);
             byte[] buf = IOUtils.toByteArray(is);
-            getLog().debug(new String(buf, encoding));
+            if (verbose) {
+                getLog().debug(new String(buf, encoding));
+            }
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(true);
             // doc=factory.newDocumentBuilder().parse(new ByteArrayInputStream(buf),encoding);
@@ -433,9 +438,9 @@ public class EAP6DeploymentStructureMojo extends AbstractEAP6Mojo {
     }
 
     protected Document getDeploymentStructure(File file) throws Exception {
-        if(file.isDirectory()) { // inside Eclipse/m2e??
+        if (file.isDirectory()) { // inside Eclipse/m2e??
             return getDeploymentStructureFromDirectory(file);
-        }else {
+        } else {
             return getDeploymentStructureFromArchive(file);
         }
     }
