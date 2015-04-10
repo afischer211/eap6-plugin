@@ -79,6 +79,14 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
     @Parameter
     protected File destinationDir;
 
+    /**
+     * Print warnings about dependencies with false scope/type or excluded artifacts
+     *
+     * @since 1.0.1
+     */
+    @Parameter(defaultValue = "false")
+    protected Boolean printArtifactWarnings = Boolean.FALSE;
+
     @Parameter(defaultValue = "${project.build.sourceEncoding}")
     protected String encoding;
 
@@ -207,15 +215,21 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
         }
 
         for (Artifact a : artifactsNotMatchingScope) {
-            getLog().warn(
-                    "EAP6: Artifact <" + a + "> is not of required scope \"" + listToString(allowedDepScopes) + "\", but can be included as an EAP6 module "
-                            + dictionaries.find(getLog(), a.getGroupId(), a.getArtifactId(), a.getVersion()));
+            if (printArtifactWarnings) {
+                getLog().warn(
+                        "EAP6: Artifact <" + a + "> is not of required scope \"" + listToString(allowedDepScopes)
+                                + "\", but can be included as an EAP6 module " + dictionaries.find(getLog(), a.getGroupId(), a.getArtifactId(), a.getVersion()));
+            }
         }
         for (Artifact a : artifactsNotMatchingType) {
-            getLog().warn("EAP6: Artifact <" + a + "> is not of required type \"" + listToString(allowedDepTypes) + "\"");
+            if (printArtifactWarnings) {
+                getLog().warn("EAP6: Artifact <" + a + "> is not of required type \"" + listToString(allowedDepTypes) + "\"");
+            }
         }
         for (Artifact a : artifactsMatchingExPatterns) {
-            getLog().warn("EAP6: Artifact <" + a + "> matches excluded artifact-patterns");
+            if (printArtifactWarnings) {
+                getLog().warn("EAP6: Artifact <" + a + "> matches excluded artifact-patterns");
+            }
         }
     }
 
