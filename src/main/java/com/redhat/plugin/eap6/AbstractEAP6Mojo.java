@@ -31,12 +31,6 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.maven.artifact.Artifact;
@@ -50,6 +44,10 @@ import org.apache.maven.project.MavenProject;
 import org.apache.maven.shared.artifact.filter.StrictPatternExcludesArtifactFilter;
 import org.sonatype.plexus.build.incremental.BuildContext;
 import org.w3c.dom.Document;
+import org.w3c.dom.ls.DOMImplementationLS;
+import org.w3c.dom.ls.LSException;
+import org.w3c.dom.ls.LSOutput;
+import org.w3c.dom.ls.LSSerializer;
 
 /**
  * This abstract EAP6 Mojo initializes the module dictionaries and the skeleton file
@@ -150,13 +148,13 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
             // Load the default dictionary
             dictionaries.addDictionary(getClass().getResourceAsStream("/eap6.dict"));
             // load configured dictionaries
-            for (File f : dictionaryFiles) {
+            for (final File f : dictionaryFiles) {
                 if (f != null && f.canRead()) {
                     getLog().debug("Reading dict-file " + f.getName());
                     dictionaries.addDictionary(f);
                 }
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             throw new MojoFailureException("Cannot load dictionaries", e);
         }
 
@@ -170,14 +168,14 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
         }
 
         if (verbose) {
-            for (Artifact x : dependencies)
+            for (final Artifact x : dependencies)
                 getLog().debug("Project-Dependency Artifact: <" + x + "> type: <" + x.getType() + "> scope: <" + x.getScope() + ">");
         }
         // Find artifacts that are not provided, but in the dictionary,
         // and warn
-        Set<Artifact> artifactsNotMatchingScope = new TreeSet<Artifact>();
-        Set<Artifact> artifactsNotMatchingType = new TreeSet<Artifact>();
-        Set<Artifact> artifactsMatchingExPatterns = new TreeSet<Artifact>();
+        final Set<Artifact> artifactsNotMatchingScope = new TreeSet<Artifact>();
+        final Set<Artifact> artifactsNotMatchingType = new TreeSet<Artifact>();
+        final Set<Artifact> artifactsMatchingExPatterns = new TreeSet<Artifact>();
 
         // Find artifacts that should be in deployment structure, that is,
         // all artifacts that have a non-null mapping, and provided
@@ -187,10 +185,10 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
 
         getLog().info("Excluded artifacts: " + listToString(excludedArtifacts));
 
-        ArtifactFilter artifactFilter = excludedArtifacts != null ? new StrictPatternExcludesArtifactFilter(excludedArtifacts) : null;
+        final ArtifactFilter artifactFilter = excludedArtifacts != null ? new StrictPatternExcludesArtifactFilter(excludedArtifacts) : null;
 
-        for (Artifact a : dependencies) {
-            DictItem item = dictionaries.find(getLog(), a.getGroupId(), a.getArtifactId(), a.getVersion());
+        for (final Artifact a : dependencies) {
+            final DictItem item = dictionaries.find(getLog(), a.getGroupId(), a.getArtifactId(), a.getVersion());
             if (item != null && item.getModuleName() != null) {
                 reverseMap.put(item.getModuleName(), a);
 
@@ -214,59 +212,58 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
             }
         }
 
-        for (Artifact a : artifactsNotMatchingScope) {
+        for (final Artifact a : artifactsNotMatchingScope) {
             if (printArtifactWarnings) {
-                getLog().warn(
-                        "EAP6: Artifact <" + a + "> is not of required scope \"" + listToString(allowedDepScopes)
-                                + "\", but can be included as an EAP6 module " + dictionaries.find(getLog(), a.getGroupId(), a.getArtifactId(), a.getVersion()));
+                getLog().warn("EAP6: Artifact <" + a + "> is not of required scope \"" + listToString(allowedDepScopes)
+                        + "\", but can be included as an EAP6 module " + dictionaries.find(getLog(), a.getGroupId(), a.getArtifactId(), a.getVersion()));
             }
         }
-        for (Artifact a : artifactsNotMatchingType) {
+        for (final Artifact a : artifactsNotMatchingType) {
             if (printArtifactWarnings) {
                 getLog().warn("EAP6: Artifact <" + a + "> is not of required type \"" + listToString(allowedDepTypes) + "\"");
             }
         }
-        for (Artifact a : artifactsMatchingExPatterns) {
+        for (final Artifact a : artifactsMatchingExPatterns) {
             if (printArtifactWarnings) {
                 getLog().warn("EAP6: Artifact <" + a + "> matches excluded artifact-patterns");
             }
         }
     }
 
-    protected String listToString(List<String> list) {
-        StringBuilder sb = new StringBuilder();
-        for (String scope : list) {
+    protected String listToString(final List<String> list) {
+        final StringBuilder sb = new StringBuilder();
+        for (final String scope : list) {
             sb.append(scope + ",");
         }
         sb.deleteCharAt(sb.length() - 1);
         return sb.toString();
     }
 
-    protected boolean isMatchingScope(Artifact a) {
+    protected boolean isMatchingScope(final Artifact a) {
         return allowedDepScopes.contains(a.getScope());
     }
 
-    protected boolean isMatchingType(Artifact a) {
+    protected boolean isMatchingType(final Artifact a) {
         return (allowedDepTypes.isEmpty() ? true : allowedDepTypes.contains(a.getType()));
     }
 
-    protected Artifact findArtifact(String groupId, String artifactId) {
-        Set<Artifact> artifacts = project.getArtifacts();
+    protected Artifact findArtifact(final String groupId, final String artifactId) {
+        final Set<Artifact> artifacts = project.getArtifacts();
         if (verbose) {
             getLog().debug("Searching " + groupId + ":" + artifactId + " in " + artifacts);
         }
-        for (Artifact x : artifacts) {
+        for (final Artifact x : artifacts) {
             if (x.getGroupId().equals(groupId) && x.getArtifactId().equals(artifactId))
                 return x;
         }
         return null;
     }
 
-    protected Document initializeSkeletonFile(String skeletonFileName) throws MojoFailureException {
+    protected Document initializeSkeletonFile(final String skeletonFileName) throws MojoFailureException {
         // Is there a skeleton file?
         Document doc;
         try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(true);
             File skeletonFile = null;
             if (skeletonDir != null)
@@ -280,38 +277,39 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
             }
 
             return doc;
-        } catch (Exception e) {
+        } catch (final Exception e) {
             throw new MojoFailureException("Cannot initialize skeleton XML", e);
         }
     }
 
-    protected void writeXmlFile(Document doc, File workDirectory, String fileName) throws MojoFailureException {
-        File destinationFile = new File(workDirectory, fileName);
+    protected void writeXmlFile(final Document doc, final File workDirectory, final String fileName) throws MojoFailureException {
+        final File destinationFile = new File(workDirectory, fileName);
         try {
-            FileOutputStream ostream = new FileOutputStream(destinationFile);
-            TransformerFactory tf = TransformerFactory.newInstance();
-            Transformer transformer = tf.newTransformer();
-            transformer.setOutputProperty(OutputKeys.METHOD, "xml");
-            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-            transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
-            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
-            transformer.transform(new DOMSource(doc), new StreamResult(ostream));
+            final FileOutputStream ostream = new FileOutputStream(destinationFile);
+            final DOMImplementationLS domImplementation = (DOMImplementationLS) doc.getImplementation();
+            final LSSerializer lsSerializer = domImplementation.createLSSerializer();
+            lsSerializer.getDomConfig().setParameter("format-pretty-print", Boolean.TRUE);
+
+            final LSOutput lsOutput = domImplementation.createLSOutput();
+            lsOutput.setByteStream(ostream);
+            lsSerializer.write(doc, lsOutput);
+
             ostream.close();
             refreshEclipse(destinationFile);
-        } catch (Exception e) {
+        } catch (final Exception e) {
             throw new MojoFailureException("Cannot write output file", e);
         }
     }
 
     protected void writeXmlFile(final String content, final File workDirectory, final String fileName) throws MojoFailureException {
-        File destinationFile = new File(workDirectory, fileName);
+        final File destinationFile = new File(workDirectory, fileName);
 
         try {
-            FileOutputStream ostream = new FileOutputStream(destinationFile);
+            final FileOutputStream ostream = new FileOutputStream(destinationFile);
             ostream.write(content.getBytes(Charset.forName(encoding)));
             ostream.close();
             refreshEclipse(destinationFile);
-        } catch (Exception e) {
+        } catch (final Exception e) {
             throw new MojoFailureException("Cannot write output file", e);
         }
     }
@@ -331,28 +329,31 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
      * @param doc
      * @return
      */
-    protected String getStringFromDocument(Document doc) {
+    protected String getStringFromDocument(final Document doc) {
         try {
-            DOMSource domSource = new DOMSource(doc);
-            StringWriter writer = new StringWriter();
-            StreamResult result = new StreamResult(writer);
-            TransformerFactory tf = TransformerFactory.newInstance();
-            Transformer transformer = tf.newTransformer();
-            transformer.transform(domSource, result);
+            final StringWriter writer = new StringWriter();
+            final DOMImplementationLS domImplementation = (DOMImplementationLS) doc.getImplementation();
+            final LSSerializer lsSerializer = domImplementation.createLSSerializer();
+            lsSerializer.getDomConfig().setParameter("format-pretty-print", Boolean.TRUE);
+
+            final LSOutput lsOutput = domImplementation.createLSOutput();
+            lsOutput.setCharacterStream(writer);
+            lsSerializer.write(doc, lsOutput);
+
             return writer.toString();
-        } catch (TransformerException ex) {
+        } catch (final LSException ex) {
             getLog().error(ex);
             return null;
         }
     }
 
-    protected void addResourceDir(File resDir) {
+    protected void addResourceDir(final File resDir) {
         if (addResourceFolder && resDir != null && resDir.exists()) {
-            Resource res = new Resource();
-            Path pathResourceDir = Paths.get(resDir.toURI());
-            Path pathProject = Paths.get(project.getBasedir().toURI());
-            Path pathRelativeDir = pathProject.relativize(pathResourceDir);
-            String stringRelativeDir = FilenameUtils.separatorsToUnix(pathRelativeDir.toString());
+            final Resource res = new Resource();
+            final Path pathResourceDir = Paths.get(resDir.toURI());
+            final Path pathProject = Paths.get(project.getBasedir().toURI());
+            final Path pathRelativeDir = pathProject.relativize(pathResourceDir);
+            final String stringRelativeDir = FilenameUtils.separatorsToUnix(pathRelativeDir.toString());
             res.setDirectory(stringRelativeDir);
             getLog().info("Adding dir <" + resDir.getPath() + "> as relative path <" + stringRelativeDir + "> to project-resources");
             if (project != null) {
