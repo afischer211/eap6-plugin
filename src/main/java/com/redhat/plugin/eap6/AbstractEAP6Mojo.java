@@ -232,8 +232,12 @@ public abstract class AbstractEAP6Mojo extends AbstractMojo {
 
     protected String listToString(final List<String> list) {
         final StringBuilder sb = new StringBuilder();
+        if (list == null || list.size()<=0) {
+            return sb.toString();
+        }
+        
         for (final String scope : list) {
-            sb.append(scope + ",");
+            sb.append(scope).append(",");
         }
         sb.deleteCharAt(sb.length() - 1);
         return sb.toString();
